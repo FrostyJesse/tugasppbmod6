@@ -21,7 +21,34 @@ function assertValidTemperature(temperature) {
 }
 
 export const ReadingsModel = {
-  async list() {
+  async list(page, limit) {
+    if (page && limit) {
+      const pageNum = Math.max(1, parseInt(page, 10) || 1);
+      const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+      const offset = (pageNum - 1) * limitNum;
+
+      const countResult = await pool.query(
+        `SELECT COUNT(*) AS total FROM public.sensor_readings`
+      );
+      const total = parseInt(countResult.rows[0]?.total || 0, 10);
+      const totalPages = Math.max(1, Math.ceil(total / limitNum));
+
+      const { rows } = await pool.query(
+        `SELECT id, temperature, threshold_value, recorded_at
+         FROM public.sensor_readings
+         ORDER BY recorded_at DESC
+         LIMIT $1 OFFSET $2`,
+        [limitNum, offset]
+      );
+      return {
+        data: rows.map(normalize),
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages,
+      };
+    }
+
     const { rows } = await pool.query(
       `SELECT id, temperature, threshold_value, recorded_at
        FROM public.sensor_readings
